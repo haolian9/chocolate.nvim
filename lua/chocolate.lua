@@ -183,7 +183,11 @@ function M.clear()
   local keywords = dictlib.keys(state.matches)
   if #keywords == 0 then return jelly.info("no highlights") end
   if #keywords == 1 then return clear_highlights(bufnr, keywords[1]) end
-  puff.select(keywords, { prompt = "🍫" }, function(keyword) clear_highlights(bufnr, keyword) end)
+  table.insert(keywords, 1, "[all]")
+  puff.select(keywords, { prompt = "🍫" }, function(entry, index) --
+    local keyword = index > 1 and entry or nil
+    clear_highlights(bufnr, keyword)
+  end)
 end
 
 return M
