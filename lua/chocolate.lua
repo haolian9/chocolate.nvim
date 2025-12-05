@@ -192,7 +192,10 @@ local function highlight(winid, keyword)
       table.insert(poses, { lnum = lnum, start_col = start_col, stop_col = stop_col })
     end
   end
-  if #poses < 2 then return jelly.info("less than 2 matches") end
+  if #poses < 2 then
+    state.matches[keyword] = { color = color, ng = ng, xmarks = {} }
+    return jelly.info("less than 2 matches")
+  end
 
   local xmarks = {}
   local higroup = assert(facts.higroups[color])
@@ -206,7 +209,6 @@ local function highlight(winid, keyword)
       --todo: update/delete on buffer changing
     })
   end
-
   state.matches[keyword] = { color = color, ng = ng, xmarks = xmarks }
 end
 
