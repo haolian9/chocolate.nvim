@@ -3,11 +3,11 @@ to highlight selected word or word under cursor
 ## design choices, features, limits
 * keyword/fixedstr only, with boundary
 * finite number of colors
-* incremental match scope: by repeats .{vsel,cword}()
+* incremental match scope. repeatable .{vsel,cword}()
 * per-buffer state
-* highlights showing in all windows
+* highlights seeing in all windows who bound to the same buffer
   * extmark vs matchadd*
-* no jump support. use a motion plugin instead
+* no jumping support. use a motion plugin instead
 
 ## status
 * just works (tm)
@@ -15,6 +15,7 @@ to highlight selected word or word under cursor
 
 ## prerequisites
 * nvim 0.11.*
+* with treesitter enabled
 * haolian9/infra.nvim
 * haolian9/puff.nvim
 
