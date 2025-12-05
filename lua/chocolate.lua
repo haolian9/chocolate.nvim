@@ -180,14 +180,24 @@ function M.clear()
   local bufnr = ni.get_current_buf()
   local state = states[bufnr]
   if state == nil then return jelly.info("no highlights") end
-  local keywords = dictlib.keys(state.matches)
-  if #keywords == 0 then return jelly.info("no highlights") end
-  if #keywords == 1 then return clear_highlights(bufnr, keywords[1]) end
-  table.insert(keywords, 1, "[all]")
-  puff.select(keywords, { prompt = "🍫" }, function(entry, index) --
-    local keyword = index > 1 and entry or nil
-    clear_highlights(bufnr, keyword)
-  end)
+  do --try cword first
+    local keyword = vim.fn.expand("<cword>")
+    if state.matches[keyword] then return clear_highlights(bufnr, keyword) end
+  end
+  do --try vsel then
+    local keyword = vsel.oneline_text(bufnr)
+    if state.matches[keyword] then return clear_highlights(bufnr, keyword) end
+  end
+  do --let use decide
+    local keywords = dictlib.keys(state.matches)
+    if #keywords == 0 then return jelly.info("no highlights") end
+    if #keywords == 1 then return clear_highlights(bufnr, keywords[1]) end
+    table.insert(keywords, 1, "[all]")
+    puff.select(keywords, { prompt = "🍫" }, function(entry, index) --
+      local keyword = index > 1 and entry or nil
+      clear_highlights(bufnr, keyword)
+    end)
+  end
 end
 
 return M
