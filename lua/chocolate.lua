@@ -3,7 +3,7 @@
 ---design choices, features, limits
 ---* keyword/fixedstr only, with boundary
 ---* finite number of colors
----* match scope: function or global
+---* match scope: incremental
 ---* per-buffer state
 ---* highlights showing in all windows
 ---  * extmark vs matchadd*
@@ -17,8 +17,10 @@ local new_table = require("table.new")
 local buflines = require("infra.buflines")
 local dictlib = require("infra.dictlib")
 local highlighter = require("infra.highlighter")
-local jelly = require("infra.jellyfish")("chocolate", "debug")
+local jelly = require("infra.jellyfish")("chocolate", "info")
 local ni = require("infra.ni")
+local nuts = require("infra.nuts")
+local prefer = require("infra.prefer")
 local VimRegex = require("infra.VimRegex")
 local vsel = require("infra.vsel")
 
@@ -45,6 +47,14 @@ do
     hi(hig, { fg = pair[2], bg = pair[1] })
     facts.higroups[i] = hig
   end
+
+  facts.ftstops = {
+    lua = { function_declaration = true, function_definition = true, do_statement = true, chunk = true },
+    python = { function_definition = true },
+    zig = { function_declaration = true, struct_declaration = true, test_declaration = true },
+    c = { function_definition = true },
+    go = { function_declaration = true, function_literal = true },
+  }
 end
 
 local Palette
@@ -81,6 +91,24 @@ do
   end
 end
 
+---@param winid integer
+---@param ng integer
+---@return TSNode?
+local function find_stop_node(winid, ng)
+  local bufnr = ni.win_get_buf(winid)
+  local stops = facts.ftstops[prefer.bo(bufnr, "filetype")]
+  if stops == nil then return end
+  ---@type TSNode?
+  local node = nuts.node_at_cursor(winid)
+  while node ~= nil do
+    if stops[node:type()] then
+      ng = ng - 1
+      if ng <= 0 then return node end
+    end
+    node = node:parent()
+  end
+end
+
 local create_regex
 do
   local rope = ropes.new(64)
@@ -98,50 +126,12 @@ end
 
 ---@class chocolate.Matches
 ---@field color  integer
+---@field ng     integer @number of generations
 ---@field xmarks integer[]
 
 ---{bufnr:{palette,{keyword:matches}}}
 ---@type table<integer, {palette:chocolate.Palette,matches:table<string,chocolate.Matches>}>
 local states = {}
-
-local function highlight(bufnr, keyword)
-  local state = states[bufnr]
-  if state == nil then
-    state = { palette = Palette(), matches = {} }
-    states[bufnr] = state
-  end
-
-  if state.matches[keyword] then return jelly.info("highlighted already") end
-
-  local regex = create_regex(keyword)
-
-  local color = state.palette:allocate()
-  if color == nil then return jelly.info("ran out of color") end
-  local higroup = assert(facts.higroups[color])
-
-  local matches = {}
-  --todo: within function
-  for lnum = 0, buflines.high(bufnr) do
-    for start_col, stop_col in regex:iter_line(bufnr, lnum) do
-      table.insert(matches, { lnum = lnum, start_col = start_col, stop_col = stop_col })
-    end
-  end
-  if #matches < 2 then return jelly.info("less than 2 matches") end
-
-  local xmarks = {}
-  for i, mat in ipairs(matches) do
-    xmarks[i] = ni.buf_set_extmark(bufnr, facts.xmark_ns, mat.lnum, mat.start_col, {
-      end_row = mat.lnum,
-      end_col = mat.stop_col,
-      hl_group = higroup,
-      invalidate = true,
-      undo_restore = true,
-      --todo: update/delete on buffer changing
-    })
-  end
-
-  state.matches[keyword] = { color = color, xmarks = xmarks }
-end
 
 ---@param bufnr integer
 ---@param keyword? string
@@ -162,18 +152,77 @@ local function clear_highlights(bufnr, keyword)
   end
 end
 
+local function highlight(winid, keyword)
+  local bufnr = ni.win_get_buf(winid)
+  local state = states[bufnr]
+  if state == nil then
+    state = { palette = Palette(), matches = {} }
+    states[bufnr] = state
+  end
+
+  local ng = 0
+  if state.matches[keyword] then
+    --todo: reuse color
+    ng = state.matches[keyword].ng
+    clear_highlights(bufnr, keyword)
+  end
+
+  local color = state.palette:allocate()
+  if color == nil then return jelly.info("ran out of color") end
+
+  assert(color) --only if there is an available color
+  ng = ng + 1
+
+  local range_begin, range_end --both are 0-based and inclusive
+  do
+    local node = find_stop_node(winid, ng)
+    if node == nil then
+      range_begin, range_end = 0, buflines.high(bufnr)
+    else
+      local start, _, stop = nuts.node_range(node)
+      jelly.info("%d ancesor generations, %s, (%s,%s)", ng, node:type(), start, stop)
+      range_begin, range_end = start, stop
+    end
+  end
+
+  local poses = {}
+  local regex = create_regex(keyword)
+  for lnum = range_begin, range_end do
+    for start_col, stop_col in regex:iter_line(bufnr, lnum) do
+      table.insert(poses, { lnum = lnum, start_col = start_col, stop_col = stop_col })
+    end
+  end
+  if #poses < 2 then return jelly.info("less than 2 matches") end
+
+  local xmarks = {}
+  local higroup = assert(facts.higroups[color])
+  for i, mat in ipairs(poses) do
+    xmarks[i] = ni.buf_set_extmark(bufnr, facts.xmark_ns, mat.lnum, mat.start_col, {
+      end_row = mat.lnum,
+      end_col = mat.stop_col,
+      hl_group = higroup,
+      invalidate = true,
+      undo_restore = true,
+      --todo: update/delete on buffer changing
+    })
+  end
+
+  state.matches[keyword] = { color = color, ng = ng, xmarks = xmarks }
+end
+
 function M.vsel()
-  local bufnr = ni.get_current_buf()
+  local winid = ni.get_current_win()
+  local bufnr = ni.win_get_buf(winid)
   local keyword = vsel.oneline_text(bufnr)
   if keyword == nil then return jelly.info("no selected text") end
-  highlight(bufnr, keyword)
+  highlight(winid, keyword)
 end
 
 function M.cword()
-  local bufnr = ni.get_current_buf()
+  local winid = ni.get_current_win()
   local keyword = vim.fn.expand("<cword>")
   if keyword == "" then return jelly.info("no cursor word") end
-  highlight(bufnr, keyword)
+  highlight(winid, keyword)
 end
 
 function M.clear()
@@ -194,6 +243,7 @@ function M.clear()
     if #keywords == 1 then return clear_highlights(bufnr, keywords[1]) end
     table.insert(keywords, 1, "[all]")
     puff.select(keywords, { prompt = "🍫" }, function(entry, index) --
+      if index == nil then return end
       local keyword = index > 1 and entry or nil
       clear_highlights(bufnr, keyword)
     end)
