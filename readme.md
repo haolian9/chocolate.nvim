@@ -1,5 +1,7 @@
 to highlight selected word or word under cursor
 
+https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
+
 ## design choices, features, limits
 * keyword/fixedstr only, with boundary
 * finite number of colors
