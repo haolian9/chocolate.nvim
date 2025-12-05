@@ -15,6 +15,7 @@ to highlight selected word or word under cursor
 ## prerequisites
 * nvim 0.11.*
 * haolian9/infra.nvim
+* haolian9/puff.nvim
 
 ## usage
 here is my setting:
