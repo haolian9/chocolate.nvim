@@ -10,6 +10,7 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
 * highlights seeing in all windows who bound to the same buffer
   * extmark vs matchadd*
 * no jumping support. use a motion plugin instead
+* no auto-update/delete: highlights/extmarks may become inaccurate while buffer changes
 
 ## status
 * just works (tm)
