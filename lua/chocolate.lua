@@ -8,12 +8,15 @@
 ---* highlights showing in all windows
 ---  * extmark vs matchadd*
 ---* no jump support. use a motion plugin instead
+---* no auto-update/delete. highlights may become inaccurate while buffer changes.
+---  * no nvim_buf_attach, which isnt possible to get working reliably to me.
 
 local M = {}
 
 local ropes = require("string.buffer")
 local new_table = require("table.new")
 
+local bags = require("infra.bags")
 local buflines = require("infra.buflines")
 local dictlib = require("infra.dictlib")
 local highlighter = require("infra.highlighter")
@@ -129,45 +132,47 @@ end
 ---@field ng     integer @number of generations
 ---@field xmarks integer[]
 
----{bufnr:{palette,{keyword:matches}}}
----@type table<integer, {palette:chocolate.Palette,matches:table<string,chocolate.Matches>}>
-local states = {}
+---@class chocolate.Bag
+---@field palette chocolate.Palette
+---@field matches table<string,chocolate.Matches>
+
+local Bag = bags.wraps("chocolate", function(bufnr) --
+  ni.buf_clear_namespace(bufnr, facts.xmark_ns, 0, -1)
+end)
 
 ---@param bufnr integer
 ---@param keyword? string
 local function clear_highlights(bufnr, keyword)
-  local state = states[bufnr]
-  if state == nil then return end
+  ---@type chocolate.Bag?
+  local bag = Bag.get(bufnr)
+  if bag == nil then return end
   if keyword == nil then
     ni.buf_clear_namespace(bufnr, facts.xmark_ns, 0, -1)
-    state.palette:reset()
-    state.matches = {}
+    bag.palette:reset()
+    bag.matches = {}
   else
-    local matches = assert(state.matches[keyword])
-    state.palette:free(matches.color)
+    local matches = assert(bag.matches[keyword])
+    bag.palette:free(matches.color)
     for _, xmid in ipairs(matches.xmarks) do
       ni.buf_del_extmark(bufnr, facts.xmark_ns, xmid)
     end
-    state.matches[keyword] = nil
+    bag.matches[keyword] = nil
   end
 end
 
 local function highlight(winid, keyword)
   local bufnr = ni.win_get_buf(winid)
-  local state = states[bufnr]
-  if state == nil then
-    state = { palette = Palette(), matches = {} }
-    states[bufnr] = state
-  end
+  ---@type chocolate.Bag
+  local bag = Bag.get(bufnr) or Bag.new(bufnr, { palette = Palette(), matches = {} })
 
   local ng = 0
-  if state.matches[keyword] then
+  if bag.matches[keyword] then
     --todo: reuse color
-    ng = state.matches[keyword].ng
+    ng = bag.matches[keyword].ng
     clear_highlights(bufnr, keyword)
   end
 
-  local color = state.palette:allocate()
+  local color = bag.palette:allocate()
   if color == nil then return jelly.info("ran out of color") end
 
   assert(color) --only if there is an available color
@@ -193,7 +198,7 @@ local function highlight(winid, keyword)
     end
   end
   if #poses < 2 then
-    state.matches[keyword] = { color = color, ng = ng, xmarks = {} }
+    bag.matches[keyword] = { color = color, ng = ng, xmarks = {} }
     return jelly.info("less than 2 matches")
   end
 
@@ -209,7 +214,7 @@ local function highlight(winid, keyword)
       --todo: update/delete on buffer changing
     })
   end
-  state.matches[keyword] = { color = color, ng = ng, xmarks = xmarks }
+  bag.matches[keyword] = { color = color, ng = ng, xmarks = xmarks }
 end
 
 function M.vsel()
@@ -229,18 +234,19 @@ end
 
 function M.clear()
   local bufnr = ni.get_current_buf()
-  local state = states[bufnr]
-  if state == nil then return jelly.info("no highlights") end
+  ---@type chocolate.Bag?
+  local bag = Bag.get(bufnr)
+  if bag == nil then return jelly.info("no highlights") end
   do --try cword first
     local keyword = vim.fn.expand("<cword>")
-    if state.matches[keyword] then return clear_highlights(bufnr, keyword) end
+    if bag.matches[keyword] then return clear_highlights(bufnr, keyword) end
   end
   do --try vsel then
     local keyword = vsel.oneline_text(bufnr)
-    if state.matches[keyword] then return clear_highlights(bufnr, keyword) end
+    if bag.matches[keyword] then return clear_highlights(bufnr, keyword) end
   end
   do --let use decide
-    local keywords = dictlib.keys(state.matches)
+    local keywords = dictlib.keys(bag.matches)
     if #keywords == 0 then return jelly.info("no highlights") end
     if #keywords == 1 then return clear_highlights(bufnr, keywords[1]) end
     table.insert(keywords, 1, "[all]")
