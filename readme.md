@@ -33,8 +33,8 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
 * here is my setting:
 ```
 do --chocolate
-  m.x("gh", [[<esc><cmd>lua require'chocolate'('dove').vsel()<cr>]])
-  m.n("gh", function() require("chocolate")("dove").cword() end)
-  m.n("gH", function() require("chocolate")("dove").clear() end)
+  m.x("gh", [[<esc><cmd>lua require'chocolate'.vsel()<cr>]])
+  m.n("gh", function() require("chocolate").cword() end)
+  m.n("gH", function() require("chocolate").clear() end)
 end
 ```
