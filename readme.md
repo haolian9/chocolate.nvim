@@ -15,14 +15,11 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
 * highlights will be seen in all windows who bound to the same buffer
   * extmark vs matchadd*
 * no jump support. use a motion plugin instead
-* highlights should be updated/deleted while buffer changes
-
-## todo
-* [] using nvim_buf_attach() to keep highlights correctness
-* [] using nvim_set_decoration_provider to add highlights to visible range of buffer only
+* [opt-in] highlights should be updated/deleted while buffer changes
 
 ## status
-* works, imperfectly
+* just works (tm)
+* feature-fozen
 
 ## prerequisites
 * nvim 0.11.*
@@ -30,11 +27,14 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
 * haolian9/puff.nvim
 
 ## usage
-here is my setting:
+* there are two flavors
+  * dove: basic impl, no highlight auto-updating
+  * snicker: offers highlight auto-adding/updating
+* here is my setting:
 ```
 do --chocolate
-  m.x("gh", [[<esc><cmd>lua require'chocolate'.vsel()<cr>]])
-  m.n("gh", function() require("chocolate").cword() end)
-  m.n("gH", function() require("chocolate").clear() end)
+  m.x("gh", [[<esc><cmd>lua require'chocolate'('dove').vsel()<cr>]])
+  m.n("gh", function() require("chocolate")("dove").cword() end)
+  m.n("gH", function() require("chocolate")("dove").clear() end)
 end
 ```
