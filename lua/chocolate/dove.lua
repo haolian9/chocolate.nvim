@@ -41,6 +41,7 @@ local function hi_occurence(bufnr, ns, higroup, lnum, start, stop) --
     hl_group = higroup,
     invalidate = true,
     undo_restore = true,
+    hl_mode = "replace",
   })
 end
 

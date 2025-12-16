@@ -31,7 +31,7 @@ local function hi_bound(bufnr, lnum)
   return ni.buf_set_extmark(bufnr, bound_ns, lnum, 0, {
     end_row = lnum,
     end_col = 0,
-    right_gravity = true,
+    right_gravity = false,
     end_right_gravity = false,
     invalidate = true,
     undo_restore = true,
@@ -40,10 +40,11 @@ end
 
 ---@param bufnr integer
 ---@param xmid integer
----@return integer lnum
+---@return integer? lnum
 local function get_bound_lnum(bufnr, xmid)
-  local xmark = ni.buf_get_extmark_by_id(bufnr, bound_ns, xmid, {})
-  return xmark[1]
+  local info = ni.buf_get_extmark_by_id(bufnr, bound_ns, xmid, { details = true })
+  if info[3].invalid then return end
+  return info[1]
 end
 
 ---@param bufnr integer
@@ -59,7 +60,8 @@ local function hi_occurence(bufnr, ns, higroup, lnum, start, stop) --
     end_col = stop,
     hl_group = higroup,
     invalidate = true,
-    undo_restore = true,
+    undo_restore = false,
+    hl_mode = "replace",
   })
 end
 
@@ -77,7 +79,7 @@ do
 
   ---@private
   function Impl:on_lines(start, stop, stop_now)
-    assert(self.status == "start")
+    assert(self.status == "start", self.status)
     if zeroset(self.bag.ns) then return end
 
     log.debug("changes: %s,%s %s,%s", start, stop, start, stop_now)
@@ -91,7 +93,8 @@ do
   ---@private
   function Impl:on_tick()
     if self.status == "deinit" then return end
-    assert(self.status == "start")
+    if self.status == "pause" then return end
+    assert(self.status == "start", self.status)
     if zeroset(self.bag.ns) then return end
 
     if zeroset(self.dels) and zeroset(self.dels) then return end
@@ -112,19 +115,28 @@ do
     if not zeroset(adds) then --add xmarks
       local bounds = {} ---@type table<string,{low:integer,high:integer}>
       for keyword, xmarks in pairs(self.bag.bounds) do
-        bounds[keyword] = { low = get_bound_lnum(self.bufnr, xmarks.low), high = get_bound_lnum(self.bufnr, xmarks.high) }
+        local low = get_bound_lnum(self.bufnr, xmarks.low)
+        local high = get_bound_lnum(self.bufnr, xmarks.high)
+        if low and high then
+          bounds[keyword] = { low = low, high = high }
+        else
+          jelly.info("bounds of keyword=%s are lost.", keyword)
+        end
       end
       log.debug("bounds: %s", bounds)
 
       for lnum in pairs(adds) do
         for keyword, ns in pairs(self.bag.ns) do
-          if lnum >= bounds[keyword].low and lnum <= bounds[keyword].high then
-            local regex = self.bag.regex[keyword]
-            local higroup = facts.higroups[self.bag.color[keyword]]
-            for start, stop in regex:iter_line(self.bufnr, lnum) do
-              hi_occurence(self.bufnr, ns, higroup, lnum, start, stop)
-            end
+          local b = bounds[keyword]
+          if b == nil then goto continue end
+          if lnum < b.low then goto continue end
+          if lnum > b.high then goto continue end
+          local regex = self.bag.regex[keyword]
+          local higroup = facts.higroups[self.bag.color[keyword]]
+          for start, stop in regex:iter_line(self.bufnr, lnum) do
+            hi_occurence(self.bufnr, ns, higroup, lnum, start, stop)
           end
+          ::continue::
         end
       end
     end
@@ -133,7 +145,7 @@ do
   function Impl:start()
     if self.status == "deinit" then error("keeper was deinited") end
     if self.status == "start" then return end
-    assert(self.status == "init" or self.status == "pause")
+    assert(self.status == "init" or self.status == "pause", self.status)
     self.status = "start"
 
     assert(ni.buf_attach(self.bufnr, false, {
@@ -150,9 +162,9 @@ do
   end
 
   function Impl:pause()
-    if self.status == "deinit" then return end
+    if self.status == "deinit" then error("keeper was deinited") end
     if self.status == "pause" then return end
-    assert(self.status == "start")
+    assert(self.status == "start", self.status)
     self.status = "pause"
     self.timer:stop()
     jelly.debug("keeper: paused")
@@ -236,8 +248,6 @@ local function highlight(winid, keyword)
     bag = Bag.new(bufnr, { ns = {}, color = {}, ng = {}, regex = {}, bounds = {} })
     bag.palette = Palette()
     bag.keeper = Keeper(bufnr, bag)
-    --todo: stop keeper when there is no need
-    --todo: keeper cancel on M.clear
   end
 
   if bag.ns[keyword] == nil then
