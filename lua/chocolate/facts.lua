@@ -1,7 +1,6 @@
 local M = {}
 
 local highlighter = require("infra.highlighter")
-local ni = require("infra.ni")
 
 M.palette = {
   { 203, 88 }, -- 赤：珊瑚红 + 深酒红 - 现代红系
