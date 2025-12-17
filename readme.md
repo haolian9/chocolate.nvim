@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
   * needs treesitter support
 * per-buffer state
 * highlights will be seen in all windows who bound to the same buffer
-  * extmark vs matchadd*
+  * extmark vs matchadd*, while extmark does can be window-local (nvim__ns_set)
 * no jump support. use a motion plugin instead
 * [opt-in] highlights should be updated/deleted while buffer changes
 
@@ -33,8 +33,8 @@ https://github.com/user-attachments/assets/345ccb97-39f8-499b-939f-14ff0213758b
 * here is my setting:
 ```
 do --chocolate
-  m.x("gh", [[<esc><cmd>lua require'chocolate'.vsel()<cr>]])
-  m.n("gh", function() require("chocolate").cword() end)
-  m.n("gH", function() require("chocolate").clear() end)
+  m.x("gh", [[<esc><cmd>lua require'chocolate'.dove.vsel()<cr>]])
+  m.n("gh", function() require("chocolate").dove.cword() end)
+  m.n("gH", function() require("chocolate").dove.clear() end)
 end
 ```
