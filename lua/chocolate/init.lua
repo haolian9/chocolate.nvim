@@ -1,7 +1,7 @@
-local M = {}
-
 local dictlib = require("infra.dictlib")
 local jelly = require("infra.jellyfish")("chocolate", "info")
+local ni = require("infra.ni")
+local oop = require("infra.oop")
 local vsel = require("infra.vsel")
 
 local puff = require("puff")
@@ -11,7 +11,13 @@ local puff = require("puff")
 ---@field highlight fun(winid:integer,keyword:string?)
 ---@field clear fun(bufnr:integer,keyword:string?)
 
+---@class chocolate.API
+---@field vsel fun()
+---@field cword fun()
+---@field clear fun()
+
 ---@param flavor chocolate.Flavor
+---@return chocolate.API
 local function API(flavor)
   local api = {}
 
@@ -57,9 +63,12 @@ local function API(flavor)
   return api
 end
 
-M.dove = API(require("chocolate.dove"))
-
-M.snicker = API(require("chocolate.snicker"))
+---@class chocolate
+---@field dove    chocolate.API
+---@field snicker chocolate.API
+local M = oop.lazyattrs({}, function(flavor)
+  local modname = string.format("chocolate.%s", flavor)
+  return API(require(modname))
+end)
 
 return M
-

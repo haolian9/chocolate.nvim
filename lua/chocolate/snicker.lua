@@ -42,24 +42,6 @@ local function get_bound_lnum(bufnr, xmid)
   return info[1]
 end
 
----@param bufnr integer
----@param ns integer
----@param higroup string
----@param lnum integer
----@param start integer start_col
----@param stop integer stop_col
----@return integer xmid
-local function hi_occurence(bufnr, ns, higroup, lnum, start, stop) --
-  return ni.buf_set_extmark(bufnr, ns, lnum, start, { --
-    end_row = lnum,
-    end_col = stop,
-    hl_group = higroup,
-    invalidate = true,
-    undo_restore = false,
-    hl_mode = "replace",
-  })
-end
-
 local Keeper
 do
   ---@class chocolate.snicker.Keeper
@@ -129,7 +111,7 @@ do
           local regex = self.bag.regex[keyword]
           local higroup = facts.higroups[self.bag.color[keyword]]
           for start, stop in regex:iter_line(self.bufnr, lnum) do
-            hi_occurence(self.bufnr, ns, higroup, lnum, start, stop)
+            shared.hi_occurence(self.bufnr, ns, higroup, lnum, start, stop)
           end
           ::continue::
         end
@@ -281,8 +263,6 @@ function M.highlight(winid, keyword)
 
     if node then bag.ng[keyword] = ng end
     bag.bounds[keyword] = { low = hi_bound(bufnr, bound_low), high = hi_bound(bufnr, bound_high) }
-    assert(bound_low == get_bound_lnum(bufnr, bag.bounds[keyword].low))
-    assert(bound_high == get_bound_lnum(bufnr, bag.bounds[keyword].high))
   end
 
   do --highlight all occurences at first time
@@ -297,19 +277,11 @@ function M.highlight(winid, keyword)
     local higroup = assert(facts.higroups[bag.color[keyword]])
     local ns = bag.ns[keyword]
     for _, pos in ipairs(poses) do
-      hi_occurence(bufnr, ns, higroup, unpack(pos))
+      shared.hi_occurence(bufnr, ns, higroup, unpack(pos))
     end
   end
 
-  do
-    assert(bag.color[keyword])
-    assert(bag.ns[keyword])
-    assert(bag.ng[keyword])
-    assert(bag.regex[keyword])
-    assert(bag.bounds[keyword])
-
-    bag.keeper:start()
-  end
+  bag.keeper:start()
 end
 
 return M

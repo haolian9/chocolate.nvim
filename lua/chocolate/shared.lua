@@ -87,4 +87,22 @@ do
   end
 end
 
+---@param bufnr integer
+---@param ns integer
+---@param higroup string
+---@param lnum integer
+---@param start integer start_col
+---@param stop integer stop_col
+---@return integer xmid
+function M.hi_occurence(bufnr, ns, higroup, lnum, start, stop)
+  return ni.buf_set_extmark(bufnr, ns, lnum, start, { --
+    end_row = lnum,
+    end_col = stop,
+    hl_group = higroup,
+    invalidate = true,
+    undo_restore = false,
+    hl_mode = "replace",
+  })
+end
+
 return M

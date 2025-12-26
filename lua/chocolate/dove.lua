@@ -22,24 +22,6 @@ local nuts = require("infra.nuts")
 local facts = require("chocolate.facts")
 local shared = require("chocolate.shared")
 
----@param bufnr integer
----@param ns integer
----@param higroup string
----@param lnum integer
----@param start integer start_col
----@param stop integer stop_col
----@return integer xmid
-local function hi_occurence(bufnr, ns, higroup, lnum, start, stop) --
-  return ni.buf_set_extmark(bufnr, ns, lnum, start, { --
-    end_row = lnum,
-    end_col = stop,
-    hl_group = higroup,
-    invalidate = true,
-    undo_restore = true,
-    hl_mode = "replace",
-  })
-end
-
 ---@class chocolate.dove.Bag
 ---@field palette chocolate.Palette
 ---@field ns    table<string,integer> {keyword:namespace}
@@ -120,7 +102,7 @@ function M.highlight(winid, keyword)
     local higroup = assert(facts.higroups[bag.color[keyword]])
     local ns = bag.ns[keyword]
     for _, pos in ipairs(poses) do
-      hi_occurence(bufnr, ns, higroup, unpack(pos))
+      shared.hi_occurence(bufnr, ns, higroup, unpack(pos))
     end
   end
 end
